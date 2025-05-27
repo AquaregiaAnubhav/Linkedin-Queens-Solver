@@ -13,6 +13,29 @@ import matplotlib.pyplot as plt
 # from matplotlib.animation import FuncAnimation, PillowWriter
 import imageio
 
+
+def enhance_image(img, contrast_alpha=2.0, brightness_beta=0):
+    """
+    Given a BGR image:
+      1. Convert to HSV and set S channel to 255 (max saturation).
+      2. Convert back to BGR.
+      3. Apply a linear contrast/brightness adjustment:
+         output = img * contrast_alpha + brightness_beta.
+    Returns the enhanced BGR image.
+    """
+    #Max out saturation for ease of reading the image and different color
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s[:] = 255                          # full saturation
+    hsv_max = cv2.merge([h, s, v])
+    img_sat = cv2.cvtColor(hsv_max, cv2.COLOR_HSV2BGR)
+
+    #increase contrast
+    enhanced = cv2.convertScaleAbs(img_sat, alpha=contrast_alpha, beta=brightness_beta)
+
+    return enhanced
+
+
 def extract_cell_colors(img, grid_size):
     """
     Take a color image and a number grid_size.  Cut the image into grid_size by grid_size smaller squares.
@@ -45,6 +68,7 @@ def make_init_board(imgpath, grid_size):
     if image_bgr is None:
         raise ValueError(f"Could not load image from {imgpath}")
     
+    image_bgr = enhance_image(image_bgr, contrast_alpha=1.0)
     image_rgb=cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     cell_colors=extract_cell_colors(image_rgb, grid_size)
 
@@ -83,11 +107,21 @@ def draw_bd(board, cell_size=60, frames=None, show_img=True, output_path=None):
     unique_colors=sorted({cell["Color"] for row in board for cell in row})
     color_map={}
     np.random.seed(42)
-    CONTRAST_COLORS=[
-    (255, 87,  51), (44,  160, 44), (31,  119, 180), (255, 127, 14),
-    (148, 103, 189), (140, 86, 75), (227, 119, 194), (127, 127, 127),
-    (188, 189, 34), (23,  190, 207), (255, 152, 0), (199, 199, 199)
+    CONTRAST_COLORS = [
+        (223, 160, 191),  # pink
+        (150, 190, 255),  # light blue
+        ( 85, 235, 226),  # cyan
+        (230, 243, 136),  # yellow
+        (185, 178, 158),  # taupe
+        (255, 123,  96),  # coral
+        (255, 201, 146),  # peach
+        (223, 223, 223),  # light gray
+        (149, 203, 207),  # pale teal
+        (179, 223, 160),  # light green
+        (187, 163, 226),  # lavender
+        (249, 241, 221),  # cream
     ]
+
  
     #assigning fixed colors to labels
     for idx, label in enumerate(unique_colors):
@@ -687,19 +721,24 @@ def solve_queens(board):
 
 if __name__=="__main__":
     imgpath="game.png"  
-    grid_size=10
-    
+    grid_size=8
+    import time
     board=make_init_board(imgpath, grid_size)
     # draw_bd(board, cell_size=60)
     # print(board) 
     # draw_bd(board, cell_size=60, output_path="visualized_board_raw.png")
+    
+    start = time.perf_counter()
     solved_board , frames= solve_queens(board)
-
+    end = time.perf_counter()
+    elapsed = end - start
     # for row in board:
     #    # print([f"{cell['Color']}" for cell in row])
     
     draw_bd(solved_board)
     
+
+    print(f"Total execution time: {elapsed:.3f} seconds")
 
     writer=imageio.get_writer("queens_solver.mp4",format="FFMPEG", fps=10,codec="libx264",quality=10)
     

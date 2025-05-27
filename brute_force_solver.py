@@ -30,12 +30,33 @@ def extract_cell_colors(img, grid_size):
 
     return np.array(cell_colors)
 
+def enhance_image(img, contrast_alpha=1.0, brightness_beta=0):
+    """
+    Given a BGR image:
+      1. Convert to HSV and set S channel to 255 (max saturation).
+      2. Convert back to BGR.
+      3. Apply a linear contrast/brightness adjustment:
+         output = img * contrast_alpha + brightness_beta.
+    Returns the enhanced BGR image.
+    """
+    #Max out saturation for ease of reading the image and different color
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s[:] = 255                          # full saturation
+    hsv_max = cv2.merge([h, s, v])
+    img_sat = cv2.cvtColor(hsv_max, cv2.COLOR_HSV2BGR)
+
+    #increase contrast
+    enhanced = cv2.convertScaleAbs(img_sat, alpha=contrast_alpha, beta=brightness_beta)
+
+    return enhanced
 
 def make_init_board(imgpath, grid_size):
     image_bgr = cv2.imread(imgpath)
     if image_bgr is None:
         raise ValueError(f"Could not load image from {imgpath}")
-
+        
+    image_bgr = enhance_image(image_bgr, contrast_alpha=1.0)
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     cell_colors = extract_cell_colors(image_rgb, grid_size)
 

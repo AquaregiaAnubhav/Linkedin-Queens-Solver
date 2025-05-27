@@ -17,7 +17,6 @@ This project reads an image (tight screenshot or screen snippet of the game boar
    * [3. Drawing & Animation](#3-drawing--animation)
    * [4. Solving Heuristics](#4-solving-heuristics)
 5. [Function Reference](#function-reference)
-6. [Example](#example)
 
 ---
 

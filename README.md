@@ -49,6 +49,7 @@ python queens.py  # or run inside an IDE
 ```
 
 * It will solve step by step and save `out.mp4` in your folder.
+* MAKE SURE TO EDIT THE GRIDSIZE OF THE GAME BEFORE RUNNING
 
 ---
 

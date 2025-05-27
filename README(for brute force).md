@@ -1,6 +1,6 @@
 # LinkedIn Queens Solver
 
-A minimal brute‑force solver for LinkedIn’s Queens puzzle. No frills—just a clean backtracking implementation guided by color‑region size.
+A minimal hit and trial based brute‑force solver for LinkedIn’s Queens puzzle. A clean backtracking implementation guided by color‑region size.
 
 ---
 
@@ -31,7 +31,7 @@ This solver works in clear, logical stages to tackle the Queens puzzle from a sc
 
 5. **Board model construction**
 
-   * Build a 2D `board` list: each entry is a dict `{ Color: 'Cx', state: 'eligible' }`.
+   * Build a 2D `board` list: each entry is a dict `{ Color: 'Cx', state: 'eligible' }`. The `state` value can be `ineligible` and `queens` as well, indicating if a cross or a queen is placed in the cell.
    * Every cell starts as a potential queen placement.
 
 6. **Eradication routine** (`post_queen_eradication`)
@@ -48,6 +48,7 @@ This solver works in clear, logical stages to tackle the Queens puzzle from a sc
    * Repeatedly scans rows, columns, and color regions.
    * If any has exactly one `'eligible'` cell, places a queen there immediately.
    * Continues until no further automatic placements are possible.
+   * This helps the brute force ans saves from extra iterations, thus fastens the algorithm.
 
 8. **Invalid-state detection** (`inv_board_chk`)
 
@@ -70,7 +71,7 @@ This solver works in clear, logical stages to tackle the Queens puzzle from a sc
     * Save the final board image.
     * Write `queens_solver.mp4` showing the entire placement process.
 
-## ⚙️ Requirements
+## Requirements
 
 * Python 3.7+
 * OpenCV (`cv2`)
@@ -85,7 +86,7 @@ You can install all with:
 pip install opencv-python numpy scikit-learn imageio matplotlib
 ```
 
-## 🚀 Usage
+## Usage
 
 1. Put your board screenshot in the same folder as `game.png`.
 2. Run:
@@ -95,8 +96,7 @@ pip install opencv-python numpy scikit-learn imageio matplotlib
    ```
 3. Watch the console for timing and see `queens_solver.mp4` appear.
 
-## 🔍 How It Works
-
+## How It Works
 * **Color extraction**: Average pixels per cell → cluster → label.
 * **Board model**: Each cell tracks its color and state.
 * **Eradication**: Placing a queen marks row, column, region, neighbors ineligible.
@@ -108,7 +108,3 @@ pip install opencv-python numpy scikit-learn imageio matplotlib
 * `queens_solver.py` — all logic in one script.
 * `game.png`         — input screenshot.
 * `queens_solver.mp4` — output animation.
-
-## 📄 License
-
-MIT License. Copy, modify, share—no strict rules.

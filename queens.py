@@ -5,6 +5,7 @@ Created on Tue May 26 08:36:49 2025
 @author: Anubhav Prakash
 """
 
+import os
 import cv2
 import numpy as np
 from sklearn.cluster import KMeans
@@ -12,6 +13,15 @@ from itertools import combinations
 import matplotlib.pyplot as plt
 # from matplotlib.animation import FuncAnimation, PillowWriter
 import imageio
+
+def get_latest_file(folder_path):
+    files=[os.path.join(folder_path,f) for f in os.listdir(folder_path)
+             if os.path.isfile(os.path.join(folder_path,f))]
+    if not files:
+        raise FileNotFoundError(f"No files found in folder: {folder_path}")
+    latest_file =max(files,key=os.path.getmtime)
+    return latest_file
+
 
 
 def enhance_image(img, contrast_alpha=2.0, brightness_beta=0):
@@ -720,8 +730,11 @@ def solve_queens(board):
 
 
 if __name__=="__main__":
-    imgpath="game.png"  
-    grid_size=8
+    # imgpath="game.png"  
+    screenshot_folder = "C:\\Users\\Anubhav Prakash\\Pictures\\Screenshots"  # Change this to the screenshots folder
+    imgpath = get_latest_file(screenshot_folder)
+    grid_size=8 
+    #In this version, you will need to change this everytime the gridsize of the game changes. Will be sorted out in upcoming versions
     import time
     board=make_init_board(imgpath, grid_size)
     # draw_bd(board, cell_size=60)
@@ -746,10 +759,7 @@ if __name__=="__main__":
         writer.append_data(frame)
     writer.close()
 
-        
-    
 
-    
     # fig=plt.figure(figsize=(6,6))
     # im=plt.imshow(frames[0], animated=True)
     # plt.axis('off')
@@ -763,3 +773,4 @@ if __name__=="__main__":
 
     # writer=PillowWriter(fps=10) 
     # ani.save("queens_solver.mp4", writer=writer)
+

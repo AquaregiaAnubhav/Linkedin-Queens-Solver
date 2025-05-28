@@ -8,7 +8,6 @@ Created on Tue May 26 08:36:49 2025
 import os
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
-warnings.filterwarnings("ignore", message=".*macro_block_size.*")
 
 import time
 import cv2

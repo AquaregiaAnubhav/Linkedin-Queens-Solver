@@ -6,6 +6,11 @@ Created on Tue May 26 08:36:49 2025
 """
 
 import os
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+warnings.filterwarnings("ignore", message=".*macro_block_size.*")
+
+import time
 import cv2
 import numpy as np
 from sklearn.cluster import KMeans
@@ -14,17 +19,137 @@ import matplotlib.pyplot as plt
 # from matplotlib.animation import FuncAnimation, PillowWriter
 import imageio
 
+
+def pad_to_multiple(img, block_size=16): #To handle IMAGEIO FFMPEG_WRITER WARNING
+    h, w = img.shape[:2]
+    new_h = ((h + block_size - 1) // block_size) * block_size
+    new_w = ((w + block_size - 1) // block_size) * block_size
+    result = np.zeros((new_h, new_w, *img.shape[2:]), dtype=img.dtype)
+    result[:h, :w, ...] = img
+    return result
+
+
+def merge_close_lines(lines, threshold=15):
+    """
+    Merge detected lines that are within threshold distance of each other to
+    avoid distinction between thin and thick edges present in the image.
+    """
+    if not lines:
+        return []
+    
+    sorted_lines = sorted(lines)
+    merged = [sorted_lines[0]]
+    
+    for current_line in sorted_lines[1:]:
+        if current_line - merged[-1] <= threshold:
+            # Merge by taking average
+            merged[-1] = (merged[-1] + current_line) // 2
+        else:
+            merged.append(current_line)
+    
+    return merged
+
+
+def detect_grid_size(image_path, debug=False):
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        raise ValueError(f"Could not load image from {image_path}")
+    
+    if debug:
+        cv2.imshow("1. Original Grayscale", img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    
+    thresh = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                                   cv2.THRESH_BINARY_INV, 15, 8)
+    if debug:
+        cv2.imshow("2. Adaptive Threshold", thresh)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    
+    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
+    detect_horizontal = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
+    if debug:
+        cv2.imshow("3. Horizontal Lines", detect_horizontal)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    
+    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
+    detect_vertical = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
+    if debug:
+        cv2.imshow("4. Vertical Lines", detect_vertical)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    
+    grid_lines = cv2.add(detect_horizontal, detect_vertical)
+    if debug:
+        cv2.imshow("5. Combined Grid Lines", grid_lines)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    # Hough Line Transform
+    lines = cv2.HoughLinesP(grid_lines, 1, np.pi/180, threshold=100, minLineLength=40, maxLineGap=5)
+    if lines is None:
+        raise ValueError("No lines detected")
+    
+    # Visualize detected Hough lines
+    if debug:
+        hough_debug = cv2.cvtColor(grid_lines, cv2.COLOR_GRAY2BGR)
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv2.line(hough_debug, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.imshow("6. Hough Lines Detected", hough_debug)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    
+    horizontals = []
+    verticals = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        if abs(y1 - y2) < 5:  # horizontal
+            horizontals.append((y1 + y2) // 2)
+        elif abs(x1 - x2) < 5:  # vertical
+            verticals.append((x1 + x2) // 2)
+
+    
+    # Apply merging to both horizontal and vertical lines
+    horizontals_merged = merge_close_lines(horizontals)
+    verticals_merged = merge_close_lines(verticals)
+
+    if debug:
+        print("Raw horizontal lines:", sorted(horizontals))
+        print("Raw vertical lines:", sorted(verticals))
+        print("Merged horizontal lines:", horizontals_merged)
+        print("Merged vertical lines:", verticals_merged)
+        print(f"Horizontal count: {len(horizontals_merged)}")
+        print(f"Vertical count: {len(verticals_merged)}")
+
+    grid_size = min(len(horizontals_merged), len(verticals_merged)) - 1
+    if debug:
+        print(f"Calculated grid size: {grid_size}")
+    
+    if grid_size < 1:
+        raise ValueError("Failed to detect grid size automatically")
+    return grid_size
+
+
+
+
+
+
+
+
 def get_latest_file(folder_path):
-    files=[os.path.join(folder_path,f) for f in os.listdir(folder_path)
-             if os.path.isfile(os.path.join(folder_path,f))]
+    files = [os.path.join(folder_path, f) for f in os.listdir(folder_path)
+             if os.path.isfile(os.path.join(folder_path, f))]
     if not files:
         raise FileNotFoundError(f"No files found in folder: {folder_path}")
-    latest_file =max(files,key=os.path.getmtime)
+    latest_file = max(files, key=os.path.getmtime)
     return latest_file
 
 
 
-def enhance_image(img, contrast_alpha=2.0, brightness_beta=0):
+def enhance_image(img, contrast_alpha=2.0, brightness_beta=1, debug=False):
     """
     Given a BGR image:
       1. Convert to HSV and set S channel to 255 (max saturation).
@@ -36,9 +161,17 @@ def enhance_image(img, contrast_alpha=2.0, brightness_beta=0):
     #Max out saturation for ease of reading the image and different color
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     h, s, v = cv2.split(hsv)
-    s[:] = 255                          # full saturation
+    s[:] = 200                    # can change saturation value here
+    # Saturation value may needed to be changed based on the color palette in the game board
+    #Sometimes, this causes issues in color detection when similar shades are used.
+    #This work is in progress
     hsv_max = cv2.merge([h, s, v])
     img_sat = cv2.cvtColor(hsv_max, cv2.COLOR_HSV2BGR)
+    if debug:
+            
+        cv2.imshow("Enhanced with saturation", img_sat)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     #increase contrast
     enhanced = cv2.convertScaleAbs(img_sat, alpha=contrast_alpha, beta=brightness_beta)
@@ -78,7 +211,7 @@ def make_init_board(imgpath, grid_size):
     if image_bgr is None:
         raise ValueError(f"Could not load image from {imgpath}")
     
-    image_bgr = enhance_image(image_bgr, contrast_alpha=1.0)
+    image_bgr = enhance_image(image_bgr, contrast_alpha=1)
     image_rgb=cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     cell_colors=extract_cell_colors(image_rgb, grid_size)
 
@@ -156,7 +289,7 @@ def draw_bd(board, cell_size=60, frames=None, show_img=True, output_path=None):
                 cv2.putText(img, "x", (x1+20, y1+40), font, 1.2, (50, 50, 50), 2)
 
     img_rgb=cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+    img_rgb = pad_to_multiple(img_rgb)
     if frames is not None:
         frames.append(img_rgb)
         return 
@@ -633,7 +766,7 @@ def solve_queens(board):
             print("Invalid board : no further moves possible.")
             break       
 
-        print("iter count : ",iteration_count)
+        # print("iter count : ",iteration_count)
         iteration_count +=1
         changed=False
 
@@ -733,9 +866,10 @@ if __name__=="__main__":
     # imgpath="game.png"  
     screenshot_folder = "C:\\Users\\Anubhav Prakash\\Pictures\\Screenshots"  # Change this to the screenshots folder
     imgpath = get_latest_file(screenshot_folder)
-    grid_size=8 
-    #In this version, you will need to change this everytime the gridsize of the game changes. Will be sorted out in upcoming versions
-    import time
+    
+    grid_size = detect_grid_size(imgpath)
+    # print(f"Detected grid size: {grid_size}")
+
     board=make_init_board(imgpath, grid_size)
     # draw_bd(board, cell_size=60)
     # print(board) 
